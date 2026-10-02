@@ -4,9 +4,9 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      POSTGRES_USER: adscope_user
-      POSTGRES_PASSWORD: adscope_password
-      POSTGRES_DB: adscope_db
+      POSTGRES_USER: ${POSTGRES_USER:-adscope_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-adscope_db}
     ports:
       - "5432:5432"
     volumes:

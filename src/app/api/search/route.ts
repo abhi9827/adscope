@@ -1,46 +1,65 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { MOCK_ADS } from '@/lib/db/actions';
+import { checkPublicRateLimit, rateLimitResponse } from '@/lib/security/rate-limit';
+import { SearchSchema } from '@/lib/security/validation';
 
-export async function GET(request: Request) {
+const MAX_PAGE_SIZE = 50;
+
+export async function GET(request: NextRequest) {
+  // 1. Rate limit
+  if (checkPublicRateLimit(request)) {
+    return rateLimitResponse();
+  }
+
+  // 2. Validate query parameters
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get('q') || '';
-  
+  const parsed = SearchSchema.safeParse(Object.fromEntries(searchParams));
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid request parameters' },
+      { status: 400 }
+    );
+  }
+
+  const { q, page, limit } = parsed.data;
+  const safeLimit = Math.min(limit, MAX_PAGE_SIZE);
+  const safeSkip = (page - 1) * safeLimit;
+
   if (!q) {
     return NextResponse.json({ results: [] });
   }
 
   try {
-    // Prisma full-text search on PostgreSQL
-    // We use basic 'contains' for cross-database compatibility (SQLite fallback)
-    // but in a pure Postgres environment, we'd use `search`
+    // 3. Explicit Prisma filter — no arbitrary user-controlled where clauses
     const ads = await prisma.ad.findMany({
       where: {
         OR: [
           { title: { contains: q, mode: 'insensitive' } },
           { campaign: { name: { contains: q, mode: 'insensitive' } } },
-          { brand: { name: { contains: q, mode: 'insensitive' } } }
-        ]
+          { brand: { name: { contains: q, mode: 'insensitive' } } },
+        ],
       },
       include: {
         brand: true,
         platform: true,
         campaign: true,
-        creatives: true
+        creatives: true,
       },
-      take: 20
+      take: safeLimit,  // 4. Hard pagination cap
+      skip: safeSkip,
     });
-    
+
     return NextResponse.json({ results: ads });
-  } catch (error) {
-    console.error('Search failed, falling back to mock data', error);
-    
-    // Graceful degradation for $0 MVP
-    const mockResults = MOCK_ADS.filter(ad => 
-      ad.title.toLowerCase().includes(q.toLowerCase()) || 
-      ad.brand.name.toLowerCase().includes(q.toLowerCase())
-    );
-    
+  } catch {
+    // 5. Safe fallback — no error details leaked
+    const mockResults = MOCK_ADS.filter(
+      (ad) =>
+        ad.title.toLowerCase().includes(q.toLowerCase()) ||
+        ad.brand.name.toLowerCase().includes(q.toLowerCase())
+    ).slice(0, safeLimit);
+
     return NextResponse.json({ results: mockResults });
   }
 }

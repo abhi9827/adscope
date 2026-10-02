@@ -11,7 +11,7 @@
     "ingest": "tsx scripts/ingest.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3",
+    "@prisma/client": "^6.12.0",
     "clsx": "^2.1.1",
     "framer-motion": "^13.5.0",
     "lucide-react": "^1.49.0",
@@ -29,7 +29,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
-    "prisma": "^6.19.3",
+    "prisma": "^6.12.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
