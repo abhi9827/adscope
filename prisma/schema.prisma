@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Brand {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  logoUrl     String?
+  industries  Industry[]
+  campaigns   Campaign[]
+  ads         Ad[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([slug])
+}
+
+model Industry {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  brands      Brand[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model Platform {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  ads         Ad[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique
+  slug      String?  @unique
+  ads       Ad[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([code])
+  @@index([slug])
+}
+
+model AdSource {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  url         String?
+  description String?
+  ads         Ad[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  brandId     String
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  ads         Ad[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([brandId])
+  @@index([slug])
+}
+
+model Ad {
+  id             String       @id @default(cuid())
+  title          String?
+  description    String?
+  format         String       // e.g., "Video", "Image", "Carousel", "Short-form Video"
+  isDemo         Boolean      @default(true)
+  active         Boolean      @default(true)
+  sourceUrl      String?
+  sourceAdId     String?      // external or source-specific ad identifier
+  sourceMetadata Json?        // source-specific fields preserved as JSON
+  date           DateTime?
+  firstSeen      DateTime     @default(now())
+  lastSeen       DateTime     @default(now())
+  
+  brandId     String
+  brand       Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  
+  campaignId  String?
+  campaign    Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  
+  platformId  String
+  platform    Platform     @relation(fields: [platformId], references: [id], onDelete: Restrict)
+  
+  countryId   String
+  country     Country      @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  
+  sourceId    String
+  source      AdSource     @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  
+  tags        Tag[]
+  creatives   Creative[]
+  aiAnalysis  AIAnalysis?
+  creativeDna CreativeDNA?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([brandId])
+  @@index([platformId])
+  @@index([campaignId])
+  @@index([countryId])
+  @@index([sourceId])
+  @@index([sourceId, sourceAdId])
+  @@index([createdAt])
+  @@index([firstSeen])
+}
+
+model IngestionRun {
+  id              String   @id @default(cuid())
+  source          String
+  status          String   // "SUCCESS" | "FAILED" | "SKIPPED"
+  recordsFetched  Int      @default(0)
+  recordsValid    Int      @default(0)
+  recordsInvalid  Int      @default(0)
+  recordsInserted Int      @default(0)
+  recordsUpdated  Int      @default(0)
+  duplicates      Int      @default(0)
+  failed          Int      @default(0)
+  errorMessage    String?
+  durationMs      Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([source])
+  @@index([createdAt])
+}
+
+model CreativeDNA {
+  id                     String    @id @default(cuid())
+  hookType               String?   // Question, Bold Statement, Problem/Solution, Curiosity, Product Reveal, Emotional, Humor, Testimonial, Demonstration
+  visualStyle            String?   // Minimal, Cinematic, UGC, Product-focused, Lifestyle, Editorial, High-energy, Documentary, Animation
+  emotionalAngle         String?   // Excitement, Trust, Humor, Inspiration, Urgency, Curiosity, Confidence, Nostalgia
+  contentFormat          String?   // Video, Image, Carousel, Story, Short-form Video, Product Demo, UGC, Influencer
+  ctaType                String?   // Shop Now, Learn More, Sign Up, Download, Buy Now, Discover, Watch More, Visit Website
+  audienceInterpretation String?   // Athletes, Young adults, Parents, Professionals, Tech enthusiasts, Fitness enthusiasts, General consumers
+  themes                 String[]  // Multiple themes e.g. ["Athlete", "Performance", "Sports"]
+  
+  adId                   String    @unique
+  ad                     Ad        @relation(fields: [adId], references: [id], onDelete: Cascade)
+  
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([visualStyle])
+  @@index([hookType])
+  @@index([emotionalAngle])
+  @@index([ctaType])
+  @@index([contentFormat])
+}
+
+model Creative {
+  id        String   @id @default(cuid())
+  url       String
+  type      String   // e.g., "video", "image"
+  adId      String
+  ad        Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([adId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  ads       Ad[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model AIAnalysis {
+  id                String   @id @default(cuid())
+  objective         String?
+  hook              String?
+  visualStyle       String?
+  messaging         String?
+  cta               String?
+  audience          String?
+  emotionalAngle    String?
+  creativeStructure String?
+  themes            String[]
+  products          String[]
+  suggestedTags     String[]
+  
+  adId              String   @unique
+  ad                Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
